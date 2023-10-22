@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <title>Protect Your Privacy: Image Meta Data Extractor</title>
+    <style>
+        #downloadStrippedBtn,
+        #map {
+            display: none;
+        }
+
+        .collapsible {
+    background-color: #f1f1f1;
+    color: #444;
+    cursor: pointer;
+    padding: 14px;
+    width: 100%;
+    border: none;
+    text-align: left;
+    outline: none;
+    font-size: 15px;
+    transition: 0.4s;
+    border-radius: 5px;
+    margin-bottom: 5px;
+}
+
+.collapsible:hover {
+    background-color: #ddd;
+}
+
+.collapsible:after {
+/*    content: '\02795'; /* Unicode character for "plus" sign (+) */*/
+    font-size: 13px;
+    color: #777;
+    float: right;
+    margin-left: 5px;
+}
+
+.collapsible.active:after {
+    content: "\2796"; /* Unicode character for "minus" sign (-) */
+}
+
+    </style>
+</head>
+
+<body class="bg-gray-100 h-screen font-sans">
+    <div class="container mx-auto mt-5 p-5 bg-white rounded shadow-lg">
+        <h1 class="text-4xl font-bold mb-5 text-center">Protect Your Privacy 🛡️</h1>
+        <p class="text-center mb-5">Discover the hidden secrets 🕵️‍♂️ in your images and learn how to share securely.</p>
+
+        <!-- Introduction -->
+        <section class="mb-8">
+            <h2 class="text-2xl font-bold mb-3">What is Metadata? 🤔</h2>
+            <p>Metadata is the unseen data behind your images. It tells a story about your picture, like which camera took it, the date, and even where it was taken! 🌍 While fascinating, it can sometimes share more than you'd like.</p>
+        </section>
+
+        <!-- Why Strip Metadata? -->
+        <section class="mb-8">
+            <h2 class="text-2xl font-bold mb-3">Why Remove Metadata? 🤷‍♂️</h2>
+            <p>Imagine sharing a photo and unintentionally telling people exactly where it was taken! 📍 Stripping metadata ensures you only share what's visible in the photo, keeping your personal details safe.</p>
+        </section>
+
+        <!-- Upload and Action Section -->
+        <section class="mb-8">
+            <h2 class="text-2xl font-bold mb-3">Dive In 🏊‍♂️</h2>
+            <p>Let's uncover the metadata of your image and give you a cleaner version to share:</p>
+            <div class="mt-5">
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="fileInput"><i class="fas fa-upload"></i> Select your image:</label>
+                <input type="file" id="fileInput" class="border p-2 w-full mb-4">
+                <div class="flex justify-between">
+                    <button id="extractBtn" class="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded w-1/2 mr-2"><i class="fas fa-info-circle"></i> View Basic Metadata</button>
+                    <button id="extractDetailedBtn" class="bg-green-500 hover:bg-green-600 text-white p-2 rounded w-1/2 ml-2"><i class="fas fa-search-plus"></i> View Detailed Metadata</button>
+                    <!-- Add these buttons below your existing buttons -->
+<button id="clearBtn" class="bg-yellow-500 hover:bg-yellow-600 text-white p-2 rounded mt-4 m-2"><i class="fas fa-eraser"></i></button>
+<button id="resetBtn" class="bg-red-500 hover:bg-red-600 text-white p-2 rounded mt-4 ml-2 mb-2"><i class="fas fa-redo"></i></button>
+
+                </div>
+            </div>
+            <div id="metaData" class="mt-5"></div>
+                        <div id="map" class="mt-5" style="height: 400px;"></div>
+
+            <div id="detailedMetaData" class="mt-5"></div>
+            <button id="downloadStrippedBtn" class="bg-red-500 hover:bg-red-600 text-white p-2 rounded mt-4"><i class="fas fa-download"></i> Download Image Without Metadata</button>
+        </section>
+
+        <!-- Footer -->
+        <footer class="mt-10 border-t pt-5">
+            <p class="text-center">🔒 Protect your privacy. Be aware, be safe!</p>
+        </footer>
+    </div>
+
+    <!-- Your JavaScript and other scripts go here -->
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.js"></script>
+    
+    <script>
+    
+
+    function displayMap(latitude, longitude) {
+    document.getElementById("map").style.display = "block";
+
+    // Initialize the map
+    let map = L.map('map').setView([latitude, longitude], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    // Add a marker to the map at the specified location
+    L.marker([latitude, longitude]).addTo(map);
+}
+
+function clearMetadata() {
+    document.getElementById("metaData").innerHTML = "";
+    document.getElementById("detailedMetaData").innerHTML = "";
+    document.getElementById("downloadStrippedBtn").style.display = "none";
+    document.getElementById("map").style.display = "none";
+}
+
+// Function to reset everything, including clearing the uploaded image
+function resetAll() {
+    clearMetadata();
+    document.getElementById("fileInput").value = ""; // Clear the uploaded file
+}
+
+
+document.getElementById("clearBtn").addEventListener("click", clearMetadata);
+document.getElementById("resetBtn").addEventListener("click", resetAll);
+
+    function enableDownload(){
+        document.getElementById("downloadStrippedBtn").addEventListener("click", function() {
+    let file = document.getElementById("fileInput").files[0];
+
+    if (file) {
+        let reader = new FileReader();
+        reader.onload = function(e) {
+            let image = new Image();
+            image.src = e.target.result;
+            image.onload = function() {
+                // Create a canvas and draw the image onto it
+                let canvas = document.createElement('canvas');
+                canvas.width = image.width;
+                canvas.height = image.height;
+                let ctx = canvas.getContext('2d');
+                ctx.drawImage(image, 0, 0);
+
+                // Convert the canvas to a Blob
+                canvas.toBlob(function(blob) {
+                    // Create a temporary <a> element to enable downloading
+                    let link = document.createElement('a');
+                    let url = URL.createObjectURL(blob);
+                    link.href = url;
+                    link.download = 'stripped_image.jpg'; // Name of the downloaded file
+                    link.click();
+                    URL.revokeObjectURL(url); // Clean up memory
+                }, file.type); // Use the same type as the original file
+            };
+        };
+        reader.readAsDataURL(file);
+    } else {
+        alert("Please select an image first.");
+    }
+});
+
+
+    }        
+
+    function getExifDescription(key, value) {
+    let descriptions = {
+        "Make": "Camera manufacturer.",
+        "Model": "Camera model.",
+        "DateTime": "Date and time the photo was taken.",
+        "ExposureTime": "Time camera shutter is open, measured in seconds.",
+        "FNumber": `Aperture value (f/${value}).`,
+        "ISO": "ISO speed rating, indicating the sensor's sensitivity to light.",
+        "FocalLength": `Focal length of lens in millimeters (mm).`,
+        "GPSLatitude": "Geographical latitude where the photo was taken.",
+        "GPSLongitude": "Geographical longitude where the photo was taken."
+    };
+
+    return descriptions[key] || "";
+}
+    document.addEventListener("DOMContentLoaded", function() {
+
+    // Basic Metadata Extraction
+    document.getElementById("extractBtn").addEventListener("click", function() {
+        console.log("Basic button clicked");
+        
+        let file = document.getElementById("fileInput").files[0];
+
+        if (file) {
+            let fileName = file.name;
+            let fileType = file.type;
+            let fileSize = file.size;
+
+            let reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = function(e) {
+                let image = new Image();
+                image.src = e.target.result;
+                image.onload = function() {
+                    let width = this.width;
+                    let height = this.height;
+
+                    let metaDataDiv = document.getElementById("metaData");
+                    metaDataDiv.innerHTML = `
+                        <h2 class="text-xl font-bold mb-4">Basic Metadata:</h2>
+                        <p><strong>File Name:</strong> ${fileName}</p>
+                        <p><strong>File Type:</strong> ${fileType}</p>
+                        <p><strong>File Size:</strong> ${fileSize} bytes</p>
+                        <p><strong>Image Dimensions:</strong> ${width} x ${height}</p>
+                    `;
+                };
+            };
+        } else {
+            alert("Please select an image first.");
+        }
+    });
+
+    document.getElementById("extractDetailedBtn").addEventListener("click", function() {
+        console.log("Detailed button clicked");
+        
+        let file = document.getElementById("fileInput").files[0];
+
+        if (file) {
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                let image = new Image();
+                image.src = e.target.result;
+                image.onload = function() {
+                    console.log("Image loaded, trying to extract EXIF data");
+                    
+                    EXIF.getData(image, function() {
+                        console.log("EXIF data extraction triggered");
+                        
+                        let allMetaData = EXIF.getAllTags(this);
+                        let detailedMetaDataDiv = document.getElementById("detailedMetaData");
+                        detailedMetaDataDiv.innerHTML = '<h2 class="text-xl font-bold mb-4">Detailed EXIF Data:</h2>';
+                        
+                        let latitude = EXIF.getTag(this, "GPSLatitude");
+                        let longitude = EXIF.getTag(this, "GPSLongitude");
+                        if (latitude && longitude) {
+                            let latVal = latitude[0] + latitude[1] / 60 + latitude[2] / 3600;
+                            let lonVal = longitude[0] + longitude[1] / 60 + longitude[2] / 3600;
+                            displayMap(latVal, lonVal);
+                        }
+
+                        for (let key in allMetaData) {
+    if (allMetaData.hasOwnProperty(key)) {
+        detailedMetaDataDiv.innerHTML += `
+    <div class="collapsible-container mt-4">
+        <button class="collapsible w-full text-left py-2 px-4 border rounded bg-gray-200 focus:outline-none focus:ring">${key} <span class="float-right">+</span></button>
+        <div class="content hidden mt-2">
+            <p class="p-4 border rounded bg-white">${allMetaData[key]}</p>
+        </div>
+    </div>
+`;
+
+    }
+}
+
+
+// Collapsible functionality
+// Collapsible functionality
+let coll = document.querySelectorAll(".collapsible");
+coll.forEach((btn) => {
+    btn.addEventListener("click", function() {
+        let content = this.nextElementSibling;
+        if (content.classList.contains("hidden")) {
+            content.classList.remove("hidden");
+            btn.querySelector("span").textContent = "-";
+        } else {
+            content.classList.add("hidden");
+            btn.querySelector("span").textContent = "+";
+        }
+    });
+});
+
+
+
+                    });
+                };
+            };
+            reader.readAsDataURL(file);
+            document.getElementById('downloadStrippedBtn').style.display="block";
+            enableDownload()
+        } else {
+            alert("Please select an image first.");
+        }
+    });
+
+    // Modal for Image Preview
+    document.getElementById('fileInput').addEventListener('change', function() {
+        let file = document.getElementById("fileInput").files[0];
+        if (file) {
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('modalImage').src = e.target.result;
+                document.getElementById('imageModal').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    document.getElementById('closeModal').addEventListener('click', function() {
+        document.getElementById('imageModal').classList.add('hidden');
+    });
+
+    // Simple Bar Chart for Data Representation (Sample Data)
+    let ctx = document.getElementById('metaDataChart').getContext('2d');
+    let myChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Sample Data 1', 'Sample Data 2'],
+            datasets: [{
+                label: 'Sample Data',
+                data: [12, 19],  // Replace with actual data
+                backgroundColor: ['rgba(75, 192, 192, 0.2)', 'rgba(255, 159, 64, 0.2)'],
+                borderColor: ['rgba(75, 192, 192, 1)', 'rgba(255, 159, 64, 1)'],
+                borderWidth: 1
+            }]
+        }
+    });
+});
+
+    </script>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.3.1/js/all.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+    <!-- Your updated JavaScript code will go here -->
+</body>
+</html>
